@@ -477,7 +477,7 @@ def screening_run(
         help='カンマ区切りの条件式（例: "per:lte:15,roe:gte:10" または "per<=15,roe>=10"）。',
     ),
     sort_by: str | None = typer.Option(
-        None, "--sort-by", "-s", help="並び替え基準（例: per:asc, per:desc）。"
+        None, "--sort-by", "-s", help="並び替え基準（例: per, per:desc）。"
     ),
     limit: int = typer.Option(20, "--limit", "-l", help="取得件数の上限。"),
     no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
@@ -512,6 +512,9 @@ def screening_run(
                 s.security_code, s.name or "-", ", ".join(metric_strs) if metric_strs else "-"
             )
         console.print(table)
+    except ValueError as e:
+        err_console.print(f"[bold red]エラー:[/bold red] {e}")
+        raise typer.Exit(code=2)
     except IRBankAPIError as e:
         err_console.print(f"[bold red]APIエラー:[/bold red] {e}")
         raise typer.Exit(code=1)

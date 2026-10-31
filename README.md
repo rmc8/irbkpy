@@ -227,7 +227,7 @@ irbk dividends 7203
 irbk peers 7203
 
 # 複数条件による銘柄スクリーニング（一般的な比較演算子形式に対応）
-irbk screening run "roe>=15,per<=10" --sort-by "per:asc"
+irbk screening run "roe>=15,per<=10" --sort-by "per:desc"
 
 # 指標別ランキングの取得（値上がり率、値下がり率、出来高）
 irbk rankings gainers --limit 10

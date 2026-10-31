@@ -35,7 +35,7 @@ class ScreeningService(SyncService):
         """指定したフィルター条件に基づいて銘柄を検索・抽出します。
 
         フィルター条件（filters、カンマ区切り文字列またはリスト、例: "per:lte:15,roe:gte:10" または "per<=15,roe>=10"）、
-        並び替え（sort_by、例: per:asc）、件数上限（limit）、改ページカーソル（cursor）を指定できます。
+        並び替え（sort_by、例: per:desc）、件数上限（limit）、改ページカーソル（cursor）を指定できます。
         """
         filter_str = _normalize_filters(filters)
         norm_sort = normalize_sort_by(sort_by)
