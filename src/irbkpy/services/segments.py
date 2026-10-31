@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+from typing import Literal
+
+from ..models.segments import SegmentsResponse
+from .base import AsyncService, SyncService, build_query_params
+
+SegmentPeriod = Literal["annual", "quarter"]
+
+
+class SegmentsService(SyncService):
+    """事業セグメント情報ドメインの同期サービスクラス
+
+    企業の事業セグメント別売上高、営業利益、資産などの内訳データを取得します。
+    """
+
+    def list(
+        self,
+        edinet_code: str | None = None,
+        code: str | None = None,
+        security_code: str | None = None,
+        fiscal_year: int | None = None,
+        period: SegmentPeriod = "annual",
+    ) -> SegmentsResponse:
+        """指定した企業の事業セグメント別業績データを取得します。
+
+        EDINETコード（edinet_code）または銘柄コード（code、security_code）を指定します。
+        決算年度（fiscal_year）や期間種別（period、通期annualまたは四半期quarter）による絞り込みが可能です。
+        """
+        params = build_query_params(
+            security_code=code or security_code,
+            edinet_code=edinet_code,
+            fiscal_year=fiscal_year,
+            period=period,
+        )
+        data = self._client._get("/segments", params=params)
+        return SegmentsResponse.model_validate(data)
+
+
+class AsyncSegmentsService(AsyncService):
+    """事業セグメント情報ドメインの非同期サービスクラス
+
+    非同期通信によって企業の事業セグメント別業績データを取得します。
+    """
+
+    async def list(
+        self,
+        edinet_code: str | None = None,
+        code: str | None = None,
+        security_code: str | None = None,
+        fiscal_year: int | None = None,
+        period: SegmentPeriod = "annual",
+    ) -> SegmentsResponse:
+        """指定した企業の事業セグメント別業績データを非同期で取得します。
+
+        EDINETコード（edinet_code）または銘柄コード（code、security_code）を指定します。
+        決算年度（fiscal_year）や期間種別（period）による絞り込みが可能です。
+        """
+        params = build_query_params(
+            security_code=code or security_code,
+            edinet_code=edinet_code,
+            fiscal_year=fiscal_year,
+            period=period,
+        )
+        data = await self._client._get("/segments", params=params)
+        return SegmentsResponse.model_validate(data)
