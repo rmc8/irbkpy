@@ -1,0 +1,47 @@
+[project]
+name = "irbkpy"
+version = "0.1.0"
+description = "Python client and CLI for the IRBank API"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "httpx>=0.28.1",
+    "pydantic>=2.14.2",
+    "rich>=13.0.0",
+    "typer>=0.27.3",
+]
+
+[project.optional-dependencies]
+pandas = ["pandas>=2.0.0"]
+polars = ["polars>=1.0.0"]
+all = [
+    "pandas>=2.0.0",
+    "polars>=1.0.0",
+]
+
+[project.scripts]
+irbk = "irbkpy.cli.main:app"
+irbkpy = "irbkpy.cli.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "respx>=0.23.1",
+    "ruff>=0.17.3",
+    "ty>=0.0.95",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501", "UP045"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/irbkpy/__init__.py" = ["F403"]
