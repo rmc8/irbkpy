@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from types import TracebackType
 from typing import Any
 
@@ -8,7 +10,7 @@ import httpx
 
 from .cache import IRBankCache
 from .config import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, resolve_api_key
-from .exceptions import raise_for_status
+from .exceptions import RateLimitError, raise_for_status
 from .services import (
     AsyncDisclosuresService,
     AsyncDividendsService,
@@ -42,7 +44,7 @@ from .services import (
     ValuationsService,
 )
 
-USER_AGENT = "irbkpy/0.1.0"
+USER_AGENT = "irbkpy/0.1.1"
 logger = logging.getLogger("irbkpy")
 
 
@@ -63,16 +65,21 @@ class IRBankClient:
         enable_cache: bool = False,
         cache_ttl: int = 86400,
         cache_path: str | None = None,
+        max_retries: int = 3,
+        retry_backoff: float = 2.0,
     ) -> None:
         """同期クライアントを初期化します。
 
         引数api_keyが未指定の場合は、環境変数IRBK_API_KEYや.envファイルから自動解決します。
         enable_cacheを有効化すると、SQLiteによるローカルキャッシュを活用してリクエスト枠を節約します。
+        max_retriesおよびretry_backoffにより、短時間バースト制限（HTTP 429）発生時の自動待機・再試行を設定できます。
         """
         self.api_key = resolve_api_key(api_key)
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.enable_cache = enable_cache
+        self.max_retries = max_retries
+        self.retry_backoff = retry_backoff
         self.cache = (
             IRBankCache(db_path=cache_path, default_ttl=cache_ttl) if enable_cache else None
         )
@@ -126,6 +133,7 @@ class IRBankClient:
 
         キャッシュが有効化されている場合、利用枠確認（/usage）を除いて
         ローカルキャッシュの照会および保存を透過的に行います。
+        短時間バースト制限（HTTP 429）を受信した場合は指数バックオフで自動再試行します。
         """
         url = self._build_url(path)
         cache_key = None
@@ -137,14 +145,41 @@ class IRBankClient:
                 logger.debug("キャッシュにヒットしました: %s", url)
                 return cached
 
-        logger.debug("APIリクエストを送信します: %s params=%s", url, params)
-        response = self._client.get(url, params=params)
-        try:
-            data = response.json()
-        except Exception:
-            data = None
+        attempt = 0
+        while True:
+            logger.debug(
+                "APIリクエストを送信します: %s params=%s (試行%d)", url, params, attempt + 1
+            )
+            response = self._client.get(url, params=params)
+            try:
+                data = response.json()
+            except Exception:
+                data = None
 
-        raise_for_status(response.status_code, data, raw_response=response)
+            try:
+                raise_for_status(response.status_code, data, raw_response=response)
+                break
+            except RateLimitError as e:
+                attempt += 1
+                if attempt > self.max_retries:
+                    raise e
+                # Retry-Afterヘッダーの確認
+                retry_after_str = response.headers.get("Retry-After")
+                try:
+                    wait_sec = (
+                        float(retry_after_str)
+                        if retry_after_str
+                        else self.retry_backoff * (2 ** (attempt - 1))
+                    )
+                except ValueError:
+                    wait_sec = self.retry_backoff * (2 ** (attempt - 1))
+                logger.warning(
+                    "レート制限を受信しました。%.1f秒待機後に再試行します（試行%d/%d）",
+                    wait_sec,
+                    attempt,
+                    self.max_retries,
+                )
+                time.sleep(wait_sec)
 
         if cache_key and self.cache and response.status_code == 200 and isinstance(data, dict):
             self.cache.set(cache_key, data, status_code=response.status_code)
@@ -190,16 +225,21 @@ class AsyncIRBankClient:
         enable_cache: bool = False,
         cache_ttl: int = 86400,
         cache_path: str | None = None,
+        max_retries: int = 3,
+        retry_backoff: float = 2.0,
     ) -> None:
         """非同期クライアントを初期化します。
 
         引数api_keyが未指定の場合は、環境変数IRBK_API_KEYや.envファイルから自動解決します。
         enable_cacheを有効化すると、SQLiteによるローカルキャッシュを活用してリクエスト枠を節約します。
+        max_retriesおよびretry_backoffにより、短時間バースト制限（HTTP 429）発生時の自動待機・再試行を設定できます。
         """
         self.api_key = resolve_api_key(api_key)
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.enable_cache = enable_cache
+        self.max_retries = max_retries
+        self.retry_backoff = retry_backoff
         self.cache = (
             IRBankCache(db_path=cache_path, default_ttl=cache_ttl) if enable_cache else None
         )
@@ -253,6 +293,7 @@ class AsyncIRBankClient:
 
         キャッシュが有効化されている場合、利用枠確認（/usage）を除いて
         ローカルキャッシュの照会および保存を透過的に行います。
+        短時間バースト制限（HTTP 429）を受信した場合は指数バックオフで自動再試行します。
         """
         url = self._build_url(path)
         cache_key = None
@@ -264,14 +305,40 @@ class AsyncIRBankClient:
                 logger.debug("キャッシュにヒットしました: %s", url)
                 return cached
 
-        logger.debug("APIリクエストを非同期送信します: %s params=%s", url, params)
-        response = await self._client.get(url, params=params)
-        try:
-            data = response.json()
-        except Exception:
-            data = None
+        attempt = 0
+        while True:
+            logger.debug(
+                "APIリクエストを非同期送信します: %s params=%s (試行%d)", url, params, attempt + 1
+            )
+            response = await self._client.get(url, params=params)
+            try:
+                data = response.json()
+            except Exception:
+                data = None
 
-        raise_for_status(response.status_code, data, raw_response=response)
+            try:
+                raise_for_status(response.status_code, data, raw_response=response)
+                break
+            except RateLimitError as e:
+                attempt += 1
+                if attempt > self.max_retries:
+                    raise e
+                retry_after_str = response.headers.get("Retry-After")
+                try:
+                    wait_sec = (
+                        float(retry_after_str)
+                        if retry_after_str
+                        else self.retry_backoff * (2 ** (attempt - 1))
+                    )
+                except ValueError:
+                    wait_sec = self.retry_backoff * (2 ** (attempt - 1))
+                logger.warning(
+                    "レート制限を受信しました。%.1f秒待機後に再試行します（試行%d/%d）",
+                    wait_sec,
+                    attempt,
+                    self.max_retries,
+                )
+                await asyncio.sleep(wait_sec)
 
         if cache_key and self.cache and response.status_code == 200 and isinstance(data, dict):
             self.cache.set(cache_key, data, status_code=response.status_code)

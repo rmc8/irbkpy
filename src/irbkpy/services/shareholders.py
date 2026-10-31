@@ -19,11 +19,14 @@ class ShareholdersService(SyncService):
         """指定した企業の大株主一覧を取得します。
 
         銘柄コード（codeまたはsecurity_code）またはEDINETコード（edinet_code）のいずれかを指定します。
-        大株主の名称、保有株式数、持株比率、前期比率を返します。
+        銘柄コードが渡された場合は、自動的にEDINETコードを解決して問い合わせます。
         """
+        sec_code = code or security_code
+        resolved_edinet = self._resolve_edinet_code(edinet_code=edinet_code, security_code=sec_code)
+
         params = build_query_params(
-            security_code=code or security_code,
-            edinet_code=edinet_code,
+            security_code=sec_code,
+            edinet_code=resolved_edinet or edinet_code,
         )
         data = self._client._get("/shareholders", params=params)
         return ShareholdersResponse.model_validate(data)
@@ -44,10 +47,16 @@ class AsyncShareholdersService(AsyncService):
         """指定した企業の大株主一覧を非同期で取得します。
 
         銘柄コード（codeまたはsecurity_code）またはEDINETコード（edinet_code）のいずれかを指定します。
+        銘柄コードが渡された場合は、非同期でEDINETコードを自動解決します。
         """
+        sec_code = code or security_code
+        resolved_edinet = await self._resolve_edinet_code(
+            edinet_code=edinet_code, security_code=sec_code
+        )
+
         params = build_query_params(
-            security_code=code or security_code,
-            edinet_code=edinet_code,
+            security_code=sec_code,
+            edinet_code=resolved_edinet or edinet_code,
         )
         data = await self._client._get("/shareholders", params=params)
         return ShareholdersResponse.model_validate(data)

@@ -13,7 +13,7 @@ from ..models.securities import (
     SecuritySummary,
     SecurityWeeklyMarginResponse,
 )
-from .base import AsyncService, SyncService, build_query_params
+from .base import AsyncService, SyncService, build_query_params, normalize_market_name
 
 
 class SecuritiesService(SyncService):
@@ -31,9 +31,12 @@ class SecuritiesService(SyncService):
     ) -> SecuritiesListResponse:
         """銘柄一覧を取得します。
 
-        取得件数上限（limit）、改ページカーソル（cursor）、業種コード（industry）、市場区分（market）による絞り込みが可能です。
+        取得件数上限（limit、最大500件）、改ページカーソル（cursor）、業種名（industry）、市場区分（market、Prime/Standard/Growthまたは日本語指定）による絞り込みが可能です。
         """
-        params = build_query_params(limit=limit, cursor=cursor, industry=industry, market=market)
+        norm_market = normalize_market_name(market)
+        params = build_query_params(
+            limit=limit, cursor=cursor, industry=industry, market=norm_market
+        )
         data = self._client._get("/securities", params=params)
         return SecuritiesListResponse.model_validate(data)
 
@@ -52,7 +55,7 @@ class SecuritiesService(SyncService):
         while True:
             resp = self.list(limit=limit, cursor=cursor, industry=industry, market=market)
             yield from resp.securities
-            if not resp.next_cursor:
+            if not resp.next_cursor or resp.next_cursor == "***":
                 break
             cursor = resp.next_cursor
 
@@ -74,7 +77,7 @@ class SecuritiesService(SyncService):
     ) -> SecurityPricesResponse:
         """指定した銘柄コードの株価四本値および出来高を取得します。
 
-        取得開始日（from_date、YYYY-MM-DD形式）、取得終了日（to_date）、件数上限（limit）、改ページカーソル（cursor）を指定できます。
+        取得開始日（from_date、YYYY-MM-DD形式）、取得終了日（to_date）、件数上限（limit、最大500件）、改ページカーソル（cursor）を指定できます。
         """
         params = build_query_params(
             {"from_date": "from", "to_date": "to"},
@@ -107,7 +110,7 @@ class SecuritiesService(SyncService):
                 cursor=cursor,
             )
             yield from resp.prices
-            if not resp.next_cursor:
+            if not resp.next_cursor or resp.next_cursor == "***":
                 break
             cursor = resp.next_cursor
 
@@ -167,7 +170,7 @@ class SecuritiesService(SyncService):
     ) -> DisclosuresListResponse:
         """指定した銘柄の適時開示・法定開示書類の一覧を取得します。
 
-        有価証券報告書、決算短信、適時開示などの表題やPDFリンクを返します。
+        有価証券報告書、決算短信、適時開示などの表題やPDFリンクを返します（最大100件）。
         """
         params = build_query_params(limit=limit, cursor=cursor)
         data = self._client._get(f"/securities/{code}/disclosures", params=params)
@@ -188,7 +191,10 @@ class AsyncSecuritiesService(AsyncService):
         market: str | None = None,
     ) -> SecuritiesListResponse:
         """銘柄一覧を非同期で取得します。"""
-        params = build_query_params(limit=limit, cursor=cursor, industry=industry, market=market)
+        norm_market = normalize_market_name(market)
+        params = build_query_params(
+            limit=limit, cursor=cursor, industry=industry, market=norm_market
+        )
         data = await self._client._get("/securities", params=params)
         return SecuritiesListResponse.model_validate(data)
 
@@ -204,7 +210,7 @@ class AsyncSecuritiesService(AsyncService):
             resp = await self.list(limit=limit, cursor=cursor, industry=industry, market=market)
             for item in resp.securities:
                 yield item
-            if not resp.next_cursor:
+            if not resp.next_cursor or resp.next_cursor == "***":
                 break
             cursor = resp.next_cursor
 
@@ -251,7 +257,7 @@ class AsyncSecuritiesService(AsyncService):
             )
             for price in resp.prices:
                 yield price
-            if not resp.next_cursor:
+            if not resp.next_cursor or resp.next_cursor == "***":
                 break
             cursor = resp.next_cursor
 
