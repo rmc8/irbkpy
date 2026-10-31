@@ -1,7 +1,7 @@
 # irbkpy
 
 [![PyPI version](https://img.shields.io/pypi/v/irbkpy.svg?color=blue)](https://pypi.org/project/irbkpy/)
-[![Python versions](https://img.shields.io/pypi/pyversions/irbkpy.svg)](https://pypi.org/project/irbkpy/)
+[![Python versions](https://img.shields.io/badge/python-3.10+-blue.svg)](https://pypi.org/project/irbkpy/)
 [![CI status](https://img.shields.io/github/actions/workflow/status/rmc8/irbkpy/ci.yml?branch=main&label=CI)](https://github.com/rmc8/irbkpy/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
