@@ -210,14 +210,18 @@ def test_rate_limit_retry():
 
 
 def test_enum_support():
-    # Market, Period, RankingMetricのEnum指定を検証
+    # Market, Industry, Period, SegmentPeriod, RankingMetricのEnum指定を検証
     def handler(request: httpx.Request) -> httpx.Response:
         if "/securities" in request.url.path:
             assert request.url.params.get("market") == "Prime"
+            assert request.url.params.get("industry") == "輸送用機器"
             return httpx.Response(200, json={"securities": [], "next_cursor": None})
         if "/financials" in request.url.path:
             assert request.url.params.get("period") == "quarterly"
             return httpx.Response(200, json={"financials": []})
+        if "/segments" in request.url.path:
+            assert request.url.params.get("period") == "quarter"
+            return httpx.Response(200, json={"segments": []})
         if "/rankings" in request.url.path:
             assert request.url.path.endswith("/gainers")
             return httpx.Response(200, json={"metric": "gainers", "ranking": []})
@@ -227,13 +231,18 @@ def test_enum_support():
     http_client = httpx.Client(transport=transport)
     client = IRBankClient(api_key="test_key", http_client=http_client)
 
-    from irbkpy import Market, Period, RankingMetric
+    from irbkpy import Industry, Market, Period, RankingMetric, SegmentPeriod
 
-    res_sec = client.securities.list(market=Market.PRIME)
+    res_sec = client.securities.list(
+        market=Market.PRIME, industry=Industry.TRANSPORTATION_EQUIPMENT
+    )
     assert res_sec.securities == []
 
     res_fin = client.financials.get("9020", period=Period.QUARTERLY)
     assert res_fin.periods == []
+
+    res_seg = client.segments.list(edinet_code="E04147", period=SegmentPeriod.QUARTER)
+    assert res_seg.segments == []
 
     res_rank = client.rankings.get(RankingMetric.GAINERS)
     assert res_rank.metric == "gainers"

@@ -23,7 +23,7 @@ def build_query_params(
     for key, val in kwargs.items():
         if val is not None:
             query_key = rename_map.get(key, key)
-            params[query_key] = val
+            params[query_key] = val.value if isinstance(val, Enum) else val
     return params
 
 

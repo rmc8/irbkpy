@@ -13,6 +13,12 @@ from .exceptions import (
 )
 from .models import *
 from .types import (
+    AccountingStandard,
+    AccountingStandardType,
+    Industry,
+    IndustryType,
+    ListingStatus,
+    ListingStatusType,
     Market,
     MarketType,
     Period,
@@ -21,11 +27,15 @@ from .types import (
     RankingMetricType,
     SegmentPeriod,
     SegmentPeriodType,
+    SortOrder,
+    SortOrderType,
 )
 
 __version__ = "0.1.1"
 
 __all__ = [
+    "AccountingStandard",
+    "AccountingStandardType",
     "AsyncIRBankClient",
     "AuthenticationError",
     "BadRequestError",
@@ -33,6 +43,10 @@ __all__ = [
     "IRBankAPIError",
     "IRBankClient",
     "IRBankError",
+    "Industry",
+    "IndustryType",
+    "ListingStatus",
+    "ListingStatusType",
     "Market",
     "MarketType",
     "NotFoundError",
@@ -44,5 +58,7 @@ __all__ = [
     "SegmentPeriod",
     "SegmentPeriodType",
     "ServerError",
+    "SortOrder",
+    "SortOrderType",
     "__version__",
 ]
