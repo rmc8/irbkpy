@@ -56,6 +56,20 @@ def normalize_filter_expression(expr: str) -> str:
     return trimmed
 
 
+def normalize_sort_by(sort_by: str | None) -> str | None:
+    """スクリーニングのsort_by指定をAPI仕様（素の項目名）へ正規化します。
+
+    APIはper:descのような方向指定を受け付けず、項目名単体で降順ソートされる仕様のため、
+    :descや:ascが付与されている場合は自動で末尾のコロン以降を除去します。
+    """
+    if not sort_by:
+        return None
+    trimmed = sort_by.strip()
+    if ":" in trimmed:
+        return trimmed.split(":")[0].strip()
+    return trimmed
+
+
 def normalize_market_name(market: Market | MarketType | str | None) -> str | None:
     """日本語の市場区分名やMarket EnumをAPIが要求する英字名称（Prime, Standard, Growth）へ正規化します。"""
     if not market:
@@ -90,21 +104,18 @@ class SyncService:
         edinet_code: str | None = None,
         security_code: str | None = None,
     ) -> str | None:
-        """EDINETコードが未指定で証券コードが渡された場合、銘柄情報から自動解決します。"""
-        if edinet_code:
-            return edinet_code
-        if not security_code:
+        """EDINETコードまたは証券コードから正規のEDINETコードを解決します。"""
+        candidate = edinet_code or security_code
+        if not candidate:
             return None
-        # EまたはGから始まる6桁文字列はすでにEDINETコード
-        cleaned = security_code.strip().upper()
+        cleaned = candidate.strip().upper()
         if cleaned.startswith(("E", "G")) and len(cleaned) == 6:
             return cleaned
-        # 証券コードから銘柄詳細を取得してEDINETコードを解決
         try:
             detail = self._client.securities.get(cleaned)
             return detail.edinet_code
         except Exception:
-            return None
+            return edinet_code
 
 
 class AsyncService:
@@ -121,16 +132,15 @@ class AsyncService:
         edinet_code: str | None = None,
         security_code: str | None = None,
     ) -> str | None:
-        """EDINETコードが未指定で証券コードが渡された場合、銘柄情報から非同期で自動解決します。"""
-        if edinet_code:
-            return edinet_code
-        if not security_code:
+        """EDINETコードまたは証券コードから正規のEDINETコードを非同期で解決します。"""
+        candidate = edinet_code or security_code
+        if not candidate:
             return None
-        cleaned = security_code.strip().upper()
+        cleaned = candidate.strip().upper()
         if cleaned.startswith(("E", "G")) and len(cleaned) == 6:
             return cleaned
         try:
             detail = await self._client.securities.get(cleaned)
             return detail.edinet_code
         except Exception:
-            return None
+            return edinet_code

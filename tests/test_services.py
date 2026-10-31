@@ -246,3 +246,56 @@ def test_enum_support():
 
     res_rank = client.rankings.get(RankingMetric.GAINERS)
     assert res_rank.metric == "gainers"
+
+
+def test_segments_positional_code_resolution():
+    # segments.list("7203")の位置引数からEDINETコードが自動解決されるか検証
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "/securities/7203" in request.url.path:
+            return httpx.Response(
+                200,
+                json={"code": "7203", "name": "トヨタ自動車", "edinet_code": "E02144"},
+            )
+        if "/segments" in request.url.path:
+            assert request.url.params.get("edinet_code") == "E02144"
+            return httpx.Response(200, json={"segments": []})
+        return httpx.Response(404)
+
+    transport = httpx.MockTransport(handler)
+    http_client = httpx.Client(transport=transport)
+    client = IRBankClient(api_key="test_key", http_client=http_client)
+
+    res = client.segments.list("7203")
+    assert res.segments == []
+
+
+def test_screening_sort_by_normalization():
+    # sort_by="per:desc"から:descが除去されてperになるか検証
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params.get("sort_by") == "per"
+        return httpx.Response(200, json={"total_count": 0, "securities": []})
+
+    transport = httpx.MockTransport(handler)
+    http_client = httpx.Client(transport=transport)
+    client = IRBankClient(api_key="test_key", http_client=http_client)
+
+    res = client.screening.screen(filters=["roe>=10"], sort_by="per:desc")
+    assert res.total_count == 0
+
+
+def test_iter_all_small_limit_protection():
+    # 小さなlimit指定時にも50件の安全下限でAPI呼び出しが行われるか検証
+    def handler(request: httpx.Request) -> httpx.Response:
+        limit_param = request.url.params.get("limit")
+        assert limit_param is not None and int(limit_param) == 50
+        return httpx.Response(
+            200,
+            json={"securities": [{"code": "7203", "name": "トヨタ"}], "next_cursor": None},
+        )
+
+    transport = httpx.MockTransport(handler)
+    http_client = httpx.Client(transport=transport)
+    client = IRBankClient(api_key="test_key", http_client=http_client)
+
+    items = list(client.securities.iter_all(limit=2))
+    assert len(items) == 1
