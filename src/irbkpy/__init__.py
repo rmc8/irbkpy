@@ -12,8 +12,18 @@ from .exceptions import (
     ServerError,
 )
 from .models import *
+from .types import (
+    Market,
+    MarketType,
+    Period,
+    PeriodType,
+    RankingMetric,
+    RankingMetricType,
+    SegmentPeriod,
+    SegmentPeriodType,
+)
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "AsyncIRBankClient",
@@ -23,8 +33,16 @@ __all__ = [
     "IRBankAPIError",
     "IRBankClient",
     "IRBankError",
+    "Market",
+    "MarketType",
     "NotFoundError",
+    "Period",
+    "PeriodType",
+    "RankingMetric",
+    "RankingMetricType",
     "RateLimitError",
+    "SegmentPeriod",
+    "SegmentPeriodType",
     "ServerError",
     "__version__",
 ]

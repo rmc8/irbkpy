@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import Literal
-
 from ..models.financials import IndicatorsResponse
+from ..types import Period, PeriodType
 from .base import AsyncService, SyncService, build_query_params
-
-PeriodType = Literal["annual", "quarterly", "semiannual"]
 
 
 class IndicatorsService(SyncService):
@@ -19,7 +16,7 @@ class IndicatorsService(SyncService):
         code: str | None = None,
         security_code: str | None = None,
         edinet_code: str | None = None,
-        period: PeriodType = "annual",
+        period: Period | PeriodType | str = "annual",
     ) -> IndicatorsResponse:
         """指定した銘柄またはEDINETコードの経営指標を取得します。
 
@@ -46,7 +43,7 @@ class AsyncIndicatorsService(AsyncService):
         code: str | None = None,
         security_code: str | None = None,
         edinet_code: str | None = None,
-        period: PeriodType = "annual",
+        period: Period | PeriodType | str = "annual",
     ) -> IndicatorsResponse:
         """指定した銘柄またはEDINETコードの経営指標を非同期で取得します。
 

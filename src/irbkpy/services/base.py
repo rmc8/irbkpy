@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING, Any
+
+from ..types import Market, MarketType
 
 if TYPE_CHECKING:
     from ..client import AsyncIRBankClient, IRBankClient
@@ -53,10 +56,11 @@ def normalize_filter_expression(expr: str) -> str:
     return trimmed
 
 
-def normalize_market_name(market: str | None) -> str | None:
-    """日本語の市場区分名をAPIが要求する英字名称（Prime, Standard, Growth）へ正規化します。"""
+def normalize_market_name(market: Market | MarketType | str | None) -> str | None:
+    """日本語の市場区分名やMarket EnumをAPIが要求する英字名称（Prime, Standard, Growth）へ正規化します。"""
     if not market:
         return None
+    raw_str = market.value if isinstance(market, Enum) else str(market)
     market_map = {
         "プライム": "Prime",
         "プライム市場": "Prime",
@@ -68,7 +72,7 @@ def normalize_market_name(market: str | None) -> str | None:
         "グロース市場": "Growth",
         "growth": "Growth",
     }
-    cleaned = market.strip()
+    cleaned = raw_str.strip()
     return market_map.get(cleaned, cleaned)
 
 

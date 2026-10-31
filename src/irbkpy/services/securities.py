@@ -13,6 +13,7 @@ from ..models.securities import (
     SecuritySummary,
     SecurityWeeklyMarginResponse,
 )
+from ..types import Market, MarketType
 from .base import AsyncService, SyncService, build_query_params, normalize_market_name
 
 
@@ -27,7 +28,7 @@ class SecuritiesService(SyncService):
         limit: int | None = None,
         cursor: str | None = None,
         industry: str | None = None,
-        market: str | None = None,
+        market: Market | MarketType | str | None = None,
     ) -> SecuritiesListResponse:
         """銘柄一覧を取得します。
 
@@ -44,7 +45,7 @@ class SecuritiesService(SyncService):
         self,
         limit: int = 100,
         industry: str | None = None,
-        market: str | None = None,
+        market: Market | MarketType | str | None = None,
     ) -> Iterator[SecuritySummary]:
         """全銘柄をカーソルページネーションしながら順次走査します。
 
@@ -188,7 +189,7 @@ class AsyncSecuritiesService(AsyncService):
         limit: int | None = None,
         cursor: str | None = None,
         industry: str | None = None,
-        market: str | None = None,
+        market: Market | MarketType | str | None = None,
     ) -> SecuritiesListResponse:
         """銘柄一覧を非同期で取得します。"""
         norm_market = normalize_market_name(market)
@@ -202,7 +203,7 @@ class AsyncSecuritiesService(AsyncService):
         self,
         limit: int = 100,
         industry: str | None = None,
-        market: str | None = None,
+        market: Market | MarketType | str | None = None,
     ) -> AsyncIterator[SecuritySummary]:
         """全銘柄を非同期でカーソルページネーションしながら順次走査します。"""
         cursor: str | None = None

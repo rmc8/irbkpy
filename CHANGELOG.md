@@ -25,6 +25,8 @@
   - `securities list -m`において「プライム」「スタンダード」「グロース」などの日本語入力からAPI英字識別子（Prime, Standard, Growth）への自動変換に対応しました。
 - 対象Pythonバージョンの緩和
   - パッケージの対応Python環境を`>=3.10`へ拡張し、Python 3.10以降の幅広い環境で利用可能としました。
+- 市場区分・期間・ランキング指標のEnumおよびリテラル型定義の追加
+  - `Market`、`Period`、`SegmentPeriod`、`RankingMetric`の文字列Enum（StrEnum）および対応するLiteral型を導入し、ライブラリ呼び出し時のIDE自動補完や型安全性、CLIでの選択肢表示を向上させました。
 
 ## [0.1.0] - 2026-10-31
 

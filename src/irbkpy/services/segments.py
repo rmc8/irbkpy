@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import Literal
-
 from ..models.segments import SegmentsResponse
+from ..types import SegmentPeriod, SegmentPeriodType
 from .base import AsyncService, SyncService, build_query_params
-
-SegmentPeriod = Literal["annual", "quarter"]
 
 
 class SegmentsService(SyncService):
@@ -20,7 +17,7 @@ class SegmentsService(SyncService):
         code: str | None = None,
         security_code: str | None = None,
         fiscal_year: int | None = None,
-        period: SegmentPeriod = "annual",
+        period: SegmentPeriod | SegmentPeriodType | str = "annual",
     ) -> SegmentsResponse:
         """指定した企業の事業セグメント別業績データを取得します。
 
@@ -52,7 +49,7 @@ class AsyncSegmentsService(AsyncService):
         code: str | None = None,
         security_code: str | None = None,
         fiscal_year: int | None = None,
-        period: SegmentPeriod = "annual",
+        period: SegmentPeriod | SegmentPeriodType | str = "annual",
     ) -> SegmentsResponse:
         """指定した企業の事業セグメント別業績データを非同期で取得します。
 

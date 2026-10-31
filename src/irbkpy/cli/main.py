@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, cast
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -10,7 +10,7 @@ from rich.table import Table
 from ..client import IRBankClient
 from ..exceptions import IRBankAPIError
 from ..models.base import IRBankBaseModel
-from ..services.financials import PeriodType
+from ..types import MarketType, PeriodType, RankingMetric
 
 app = typer.Typer(
     name="irbk",
@@ -92,7 +92,7 @@ def usage(
 @securities_app.command("list")
 def securities_list(
     limit: int = typer.Option(50, "--limit", "-l", help="取得件数の上限（最大500件）。"),
-    market: str | None = typer.Option(
+    market: MarketType | None = typer.Option(
         None,
         "--market",
         "-m",
@@ -215,7 +215,7 @@ def securities_prices(
 @app.command("financials")
 def financials_cmd(
     code: str = typer.Argument(..., help="銘柄コードまたはEDINETコード。"),
-    period: str = typer.Option(
+    period: PeriodType = typer.Option(
         "annual", "--period", "-p", help="期間種別（annual、quarterly、semiannual）。"
     ),
     no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
@@ -229,7 +229,7 @@ def financials_cmd(
         res = client.financials.get(
             edinet_code=code if is_edinet else None,
             code=None if is_edinet else code,
-            period=cast(PeriodType, period),
+            period=period,
         )
         if as_json:
             output_result(res, as_json=True)
@@ -266,7 +266,7 @@ def financials_cmd(
 @app.command("indicators")
 def indicators_cmd(
     code: str = typer.Argument(..., help="銘柄コードまたはEDINETコード。"),
-    period: str = typer.Option(
+    period: PeriodType = typer.Option(
         "annual", "--period", "-p", help="期間種別（※現在サーバー仕様により通期10期を返却）。"
     ),
     no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
@@ -280,7 +280,7 @@ def indicators_cmd(
         res = client.indicators.get(
             edinet_code=code if is_edinet else None,
             code=None if is_edinet else code,
-            period=cast(PeriodType, period),
+            period=period,
         )
         if as_json:
             output_result(res, as_json=True)
@@ -527,7 +527,7 @@ def screening_fields(
 # ----------------------------------------------------------------------
 @app.command("rankings")
 def rankings_cmd(
-    metric: str = typer.Argument(..., help="指標キー（gainers, losers, volume）。"),
+    metric: RankingMetric = typer.Argument(..., help="指標キー（gainers, losers, volume）。"),
     target_date: str | None = typer.Option(None, "--date", "-d", help="基準日（YYYY-MM-DD）。"),
     limit: int = typer.Option(20, "--limit", "-l", help="取得件数の上限。"),
     no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),

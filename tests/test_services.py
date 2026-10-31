@@ -207,3 +207,33 @@ def test_rate_limit_retry():
     usage = client.usage.get()
     assert usage.remaining == 199
     assert call_count == 2
+
+
+def test_enum_support():
+    # Market, Period, RankingMetricのEnum指定を検証
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "/securities" in request.url.path:
+            assert request.url.params.get("market") == "Prime"
+            return httpx.Response(200, json={"securities": [], "next_cursor": None})
+        if "/financials" in request.url.path:
+            assert request.url.params.get("period") == "quarterly"
+            return httpx.Response(200, json={"financials": []})
+        if "/rankings" in request.url.path:
+            assert request.url.path.endswith("/gainers")
+            return httpx.Response(200, json={"metric": "gainers", "ranking": []})
+        return httpx.Response(404)
+
+    transport = httpx.MockTransport(handler)
+    http_client = httpx.Client(transport=transport)
+    client = IRBankClient(api_key="test_key", http_client=http_client)
+
+    from irbkpy import Market, Period, RankingMetric
+
+    res_sec = client.securities.list(market=Market.PRIME)
+    assert res_sec.securities == []
+
+    res_fin = client.financials.get("9020", period=Period.QUARTERLY)
+    assert res_fin.periods == []
+
+    res_rank = client.rankings.get(RankingMetric.GAINERS)
+    assert res_rank.metric == "gainers"
