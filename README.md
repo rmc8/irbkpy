@@ -9,8 +9,6 @@
 
 IRBank API（REST）を操作するためのPythonクライアントライブラリおよびCLIツールです。httpxによる高速な同期・非同期通信、Pydantic v2による厳格な型安全性を備え、コマンドラインからも即座に企業データへアクセスできます。
 
----
-
 ## 主な特徴
 
 - 全26エンドポイントのレスポンスをPydantic v2モデルで構造化しており、IDEの自動補完や静的型チェックに対応します。
@@ -23,8 +21,6 @@ IRBank API（REST）を操作するためのPythonクライアントライブラ
 - `iter_all()`や`iter_prices()`などのジェネレータ関数により、カーソル指定を気にせず全件を順次取得できます。
 - コマンドラインツール`irbk`を同梱しており、ターミナルから財務諸表や株価、ランキングを素早く照会できます。表形式の表示に加え、`--json`出力にも対応します。
 - APIキーは引数による直接指定のほか、環境変数（`IRBK_API_KEY`または`IRBANK_API_KEY`）や`.env`ファイルから自動で読み込まれます。
-
----
 
 ## インストール
 
@@ -48,8 +44,6 @@ pip install "irbkpy[all]"
 uv sync --all-extras
 ```
 
----
-
 ## 認証設定
 
 APIキーは[IRBANK Connect](https://app.irbank.net/mcp-api)にて発行できます。
@@ -64,8 +58,6 @@ export IRBK_API_KEY="irbk_key_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```env
 IRBK_API_KEY="irbk_key_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
-
----
 
 ## Pythonライブラリとしての利用
 
@@ -199,8 +191,6 @@ with IRBankClient() as client:
         print("APIキーが無効、または未設定です。")
 ```
 
----
-
 ## CLIツールの利用方法
 
 コマンドラインツール`irbk`が利用できます。
@@ -258,8 +248,6 @@ irbk securities get 7203 --no-cache
 irbk securities get 7203 --json | jq .issued_shares
 ```
 
----
-
 ## 提供エンドポイント一覧
 
 | カテゴリ | エンドポイント | ライブラリAPI | CLIコマンド |
@@ -291,15 +279,11 @@ irbk securities get 7203 --json | jq .issued_shares
 | rankings | `GET /rankings/{metric}` | `client.rankings.get()` | `irbk rankings` |
 | usage | `GET /usage` | `client.usage.get()` | `irbk usage` |
 
----
-
 ## テストの実行
 
 ```bash
 uv run pytest
 ```
-
----
 
 ## 継続的インテグレーション（CI）とPyPI自動デプロイ
 
