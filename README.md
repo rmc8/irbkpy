@@ -1,5 +1,12 @@
 # irbkpy
 
+[![PyPI version](https://img.shields.io/pypi/v/irbkpy.svg?color=blue)](https://pypi.org/project/irbkpy/)
+[![Python versions](https://img.shields.io/pypi/pyversions/irbkpy.svg)](https://pypi.org/project/irbkpy/)
+[![CI status](https://img.shields.io/github/actions/workflow/status/rmc8/irbkpy/ci.yml?branch=main&label=CI)](https://github.com/rmc8/irbkpy/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-e92063.svg)](https://docs.pydantic.dev/)
+
 IRBank API（REST）を操作するためのPythonクライアントライブラリおよびCLIツールです。httpxによる高速な同期・非同期通信、Pydantic v2による厳格な型安全性を備え、コマンドラインからも即座に企業データへアクセスできます。
 
 ---
