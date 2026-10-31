@@ -13,23 +13,26 @@ class SegmentsService(SyncService):
 
     def list(
         self,
-        edinet_code: str | None = None,
         code: str | None = None,
+        edinet_code: str | None = None,
         security_code: str | None = None,
         fiscal_year: int | None = None,
         period: SegmentPeriod | SegmentPeriodType | str = "annual",
     ) -> SegmentsResponse:
         """指定した企業の事業セグメント別業績データを取得します。
 
-        EDINETコード（edinet_code）または銘柄コード（code、security_code）を指定します。
+        銘柄コード（code、security_code）またはEDINETコード（edinet_code）を指定します。
         銘柄コードが渡された場合は、自動的にEDINETコードを解決して問い合わせます。
         """
-        sec_code = code or security_code
-        resolved_edinet = self._resolve_edinet_code(edinet_code=edinet_code, security_code=sec_code)
+        target = code or edinet_code or security_code
+        resolved_edinet = self._resolve_edinet_code(
+            edinet_code=edinet_code, security_code=code or security_code
+        )
+        if not resolved_edinet and target:
+            resolved_edinet = self._resolve_edinet_code(edinet_code=target)
 
         params = build_query_params(
-            security_code=sec_code,
-            edinet_code=resolved_edinet or edinet_code,
+            edinet_code=resolved_edinet or target,
             fiscal_year=fiscal_year,
             period=period,
         )
@@ -45,25 +48,26 @@ class AsyncSegmentsService(AsyncService):
 
     async def list(
         self,
-        edinet_code: str | None = None,
         code: str | None = None,
+        edinet_code: str | None = None,
         security_code: str | None = None,
         fiscal_year: int | None = None,
         period: SegmentPeriod | SegmentPeriodType | str = "annual",
     ) -> SegmentsResponse:
         """指定した企業の事業セグメント別業績データを非同期で取得します。
 
-        EDINETコード（edinet_code）または銘柄コード（code、security_code）を指定します。
+        銘柄コード（code、security_code）またはEDINETコード（edinet_code）を指定します。
         銘柄コードが渡された場合は、非同期でEDINETコードを自動解決します。
         """
-        sec_code = code or security_code
+        target = code or edinet_code or security_code
         resolved_edinet = await self._resolve_edinet_code(
-            edinet_code=edinet_code, security_code=sec_code
+            edinet_code=edinet_code, security_code=code or security_code
         )
+        if not resolved_edinet and target:
+            resolved_edinet = await self._resolve_edinet_code(edinet_code=target)
 
         params = build_query_params(
-            security_code=sec_code,
-            edinet_code=resolved_edinet or edinet_code,
+            edinet_code=resolved_edinet or target,
             fiscal_year=fiscal_year,
             period=period,
         )

@@ -74,3 +74,35 @@ def test_client_caching_behavior(tmp_path):
     sec3 = client.securities.get("7203")
     assert sec3.code == "7203"
     assert route.call_count == 2
+
+
+def test_cli_version_option():
+    from typer.testing import CliRunner
+
+    from irbkpy import __version__
+    from irbkpy.cli.main import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0
+    assert f"irbkpy {__version__}" in result.stdout
+
+    result_short = runner.invoke(app, ["-v"])
+    assert result_short.exit_code == 0
+    assert f"irbkpy {__version__}" in result_short.stdout
+
+
+def test_cli_screening_asc_value_error_formatting():
+    from typer.testing import CliRunner
+
+    from irbkpy.cli.main import app
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["screening", "run", "per<=15", "--sort-by", "per:asc", "-k", "dummy_key"],
+    )
+    assert result.exit_code == 2
+    assert "エラー:" in result.stderr
+    assert "降順（desc）ソートのみ対応しています" in result.stderr
+    assert "Traceback" not in result.stderr

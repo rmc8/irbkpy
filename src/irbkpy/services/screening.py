@@ -3,7 +3,13 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Iterator
 
 from ..models.screening import ScreenedSecurity, ScreeningFieldsResponse, ScreeningResponse
-from .base import AsyncService, SyncService, build_query_params, normalize_filter_expression
+from .base import (
+    AsyncService,
+    SyncService,
+    build_query_params,
+    normalize_filter_expression,
+    normalize_sort_by,
+)
 
 
 def _normalize_filters(filters: str | list[str]) -> str:
@@ -29,12 +35,13 @@ class ScreeningService(SyncService):
         """指定したフィルター条件に基づいて銘柄を検索・抽出します。
 
         フィルター条件（filters、カンマ区切り文字列またはリスト、例: "per:lte:15,roe:gte:10" または "per<=15,roe>=10"）、
-        並び替え（sort_by、例: per:asc）、件数上限（limit）、改ページカーソル（cursor）を指定できます。
+        並び替え（sort_by、例: per:desc）、件数上限（limit）、改ページカーソル（cursor）を指定できます。
         """
         filter_str = _normalize_filters(filters)
+        norm_sort = normalize_sort_by(sort_by)
         params = build_query_params(
             filters=filter_str,
-            sort_by=sort_by,
+            sort_by=norm_sort,
             limit=limit,
             cursor=cursor,
         )
@@ -51,9 +58,10 @@ class ScreeningService(SyncService):
 
         全該当銘柄をジェネレーターとして順番に返します。
         """
+        fetch_limit = min(max(limit, 50), 100) if limit > 0 else 100
         cursor: str | None = None
         while True:
-            resp = self.screen(filters=filters, sort_by=sort_by, limit=limit, cursor=cursor)
+            resp = self.screen(filters=filters, sort_by=sort_by, limit=fetch_limit, cursor=cursor)
             yield from resp.securities
             if not resp.next_cursor or resp.next_cursor == "***":
                 break
@@ -83,9 +91,10 @@ class AsyncScreeningService(AsyncService):
     ) -> ScreeningResponse:
         """指定したフィルター条件に基づいて銘柄を非同期で抽出します。"""
         filter_str = _normalize_filters(filters)
+        norm_sort = normalize_sort_by(sort_by)
         params = build_query_params(
             filters=filter_str,
-            sort_by=sort_by,
+            sort_by=norm_sort,
             limit=limit,
             cursor=cursor,
         )
@@ -99,9 +108,12 @@ class AsyncScreeningService(AsyncService):
         limit: int = 100,
     ) -> AsyncIterator[ScreenedSecurity]:
         """フィルター条件に合致する全銘柄を非同期で順次走査します。"""
+        fetch_limit = min(max(limit, 50), 100) if limit > 0 else 100
         cursor: str | None = None
         while True:
-            resp = await self.screen(filters=filters, sort_by=sort_by, limit=limit, cursor=cursor)
+            resp = await self.screen(
+                filters=filters, sort_by=sort_by, limit=fetch_limit, cursor=cursor
+            )
             for item in resp.securities:
                 yield item
             if not resp.next_cursor or resp.next_cursor == "***":

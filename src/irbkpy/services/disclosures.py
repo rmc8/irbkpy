@@ -40,9 +40,10 @@ class DisclosuresService(SyncService):
 
         全ページの書類メタデータをジェネレーターとして順番に返します。
         """
+        fetch_limit = min(max(limit, 50), 100) if limit > 0 else 100
         cursor: str | None = None
         while True:
-            resp = self.list(code=code, limit=limit, cursor=cursor)
+            resp = self.list(code=code, limit=fetch_limit, cursor=cursor)
             yield from resp.disclosures
             if not resp.next_cursor or resp.next_cursor == "***":
                 break
@@ -88,9 +89,10 @@ class AsyncDisclosuresService(AsyncService):
         limit: int = 100,
     ) -> AsyncIterator[DisclosureMeta]:
         """指定した銘柄の全開示書類を非同期で走査します。"""
+        fetch_limit = min(max(limit, 50), 100) if limit > 0 else 100
         cursor: str | None = None
         while True:
-            resp = await self.list(code=code, limit=limit, cursor=cursor)
+            resp = await self.list(code=code, limit=fetch_limit, cursor=cursor)
             for item in resp.disclosures:
                 yield item
             if not resp.next_cursor or resp.next_cursor == "***":

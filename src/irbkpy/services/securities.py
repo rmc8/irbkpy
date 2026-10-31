@@ -49,12 +49,14 @@ class SecuritiesService(SyncService):
     ) -> Iterator[SecuritySummary]:
         """全銘柄をカーソルページネーションしながら順次走査します。
 
-        1回あたりの取得件数上限（limit）、業種（industry）、市場（market）を指定できます。
+        1回あたりの取得件数上限（limit、APIカーソルの安定性のため最小50件を推奨）、業種（industry）、市場（market）を指定できます。
         全ページの銘柄データをジェネレーターとして順番に返します。
         """
+        # API仕様上、limitが小さすぎるとカーソルがマスクされ、大きすぎると400となるため許容範囲（50〜500）にクランプ
+        fetch_limit = min(max(limit, 50), 500) if limit > 0 else 100
         cursor: str | None = None
         while True:
-            resp = self.list(limit=limit, cursor=cursor, industry=industry, market=market)
+            resp = self.list(limit=fetch_limit, cursor=cursor, industry=industry, market=market)
             yield from resp.securities
             if not resp.next_cursor or resp.next_cursor == "***":
                 break
@@ -101,13 +103,14 @@ class SecuritiesService(SyncService):
 
         期間（from_dateからto_date）内の全株価レコードをジェネレーターとして順番に返します。
         """
+        fetch_limit = min(max(limit, 50), 500) if limit > 0 else 100
         cursor: str | None = None
         while True:
             resp = self.get_prices(
                 code=code,
                 from_date=from_date,
                 to_date=to_date,
-                limit=limit,
+                limit=fetch_limit,
                 cursor=cursor,
             )
             yield from resp.prices
@@ -206,9 +209,12 @@ class AsyncSecuritiesService(AsyncService):
         market: Market | MarketType | str | None = None,
     ) -> AsyncIterator[SecuritySummary]:
         """全銘柄を非同期でカーソルページネーションしながら順次走査します。"""
+        fetch_limit = min(max(limit, 50), 500) if limit > 0 else 100
         cursor: str | None = None
         while True:
-            resp = await self.list(limit=limit, cursor=cursor, industry=industry, market=market)
+            resp = await self.list(
+                limit=fetch_limit, cursor=cursor, industry=industry, market=market
+            )
             for item in resp.securities:
                 yield item
             if not resp.next_cursor or resp.next_cursor == "***":
@@ -247,13 +253,14 @@ class AsyncSecuritiesService(AsyncService):
         limit: int = 100,
     ) -> AsyncIterator[PriceRecord]:
         """指定した銘柄の株価履歴を非同期で走査します。"""
+        fetch_limit = min(max(limit, 50), 500) if limit > 0 else 100
         cursor: str | None = None
         while True:
             resp = await self.get_prices(
                 code=code,
                 from_date=from_date,
                 to_date=to_date,
-                limit=limit,
+                limit=fetch_limit,
                 cursor=cursor,
             )
             for price in resp.prices:

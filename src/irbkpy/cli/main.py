@@ -7,6 +7,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from .. import __version__
 from ..client import IRBankClient
 from ..exceptions import IRBankAPIError
 from ..models.base import IRBankBaseModel
@@ -19,6 +20,29 @@ app = typer.Typer(
 )
 console = Console()
 err_console = Console(stderr=True)
+
+
+def version_callback(value: bool) -> None:
+    """--versionオプション指定時にバージョン情報を表示して終了します。"""
+    if value:
+        console.print(f"irbkpy {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-v",
+        help="バージョン情報を表示して終了します。",
+        callback=version_callback,
+        is_eager=True,
+    ),
+) -> None:
+    """IRBank APIコマンドラインツールの共通オプションを処理します。"""
+    pass
+
 
 securities_app = typer.Typer(
     name="securities", help="銘柄情報、株価、信用取引データのコマンド群です。"
@@ -453,7 +477,7 @@ def screening_run(
         help='カンマ区切りの条件式（例: "per:lte:15,roe:gte:10" または "per<=15,roe>=10"）。',
     ),
     sort_by: str | None = typer.Option(
-        None, "--sort-by", "-s", help="並び替え基準（例: per:asc, per:desc）。"
+        None, "--sort-by", "-s", help="並び替え基準（例: per, per:desc）。"
     ),
     limit: int = typer.Option(20, "--limit", "-l", help="取得件数の上限。"),
     no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
@@ -488,6 +512,9 @@ def screening_run(
                 s.security_code, s.name or "-", ", ".join(metric_strs) if metric_strs else "-"
             )
         console.print(table)
+    except ValueError as e:
+        err_console.print(f"[bold red]エラー:[/bold red] {e}")
+        raise typer.Exit(code=2)
     except IRBankAPIError as e:
         err_console.print(f"[bold red]APIエラー:[/bold red] {e}")
         raise typer.Exit(code=1)

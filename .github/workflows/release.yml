@@ -1,11 +1,13 @@
 name: Release to PyPI
 
 on:
-  release:
-    types: [published]
   push:
+    branches:
+      - main
     tags:
       - "v*.*.*"
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -17,23 +19,64 @@ jobs:
       url: https://pypi.org/p/irbkpy
     permissions:
       id-token: write  # Mandatory for Trusted Publishing (OIDC)
-      contents: read
+      contents: write  # Required for creating git tags and GitHub releases
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version and determine release
+        id: check
+        run: |
+          VERSION=$(grep -m 1 '^version = ' pyproject.toml | cut -d '"' -f 2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # PyPI上に同一バージョンが既に存在するか確認
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/irbkpy/$VERSION/json")
+          if [ "$STATUS_CODE" = "200" ]; then
+            echo "irbkpy $VERSION is already published on PyPI. Skipping publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Version v$VERSION will be published."
+          echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - name: Install uv
+        if: steps.check.outputs.skip != 'true'
         uses: astral-sh/setup-uv@v5
         with:
           version: "latest"
           enable-cache: true
 
       - name: Set up Python
+        if: steps.check.outputs.skip != 'true'
         run: uv python install
 
       - name: Build package distributions
+        if: steps.check.outputs.skip != 'true'
         run: uv build
 
       - name: Publish distribution 📦 to PyPI
+        if: steps.check.outputs.skip != 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+
+      - name: Create Git Tag and GitHub Release
+        if: steps.check.outputs.skip != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            git tag -a "v$VERSION" -m "Release v$VERSION"
+            git push origin "v$VERSION"
+          fi
+          if ! gh release view "v$VERSION" >/dev/null 2>&1; then
+            gh release create "v$VERSION" --title "v$VERSION" --generate-notes
+          fi
