@@ -59,14 +59,21 @@ def normalize_filter_expression(expr: str) -> str:
 def normalize_sort_by(sort_by: str | None) -> str | None:
     """スクリーニングのsort_by指定をAPI仕様（素の項目名）へ正規化します。
 
-    APIはper:descのような方向指定を受け付けず、項目名単体で降順ソートされる仕様のため、
-    :descや:ascが付与されている場合は自動で末尾のコロン以降を除去します。
+    APIは項目名単体による降順ソートのみを受け付ける仕様のため、
+    :descが付与されている場合は末尾を除去して項目名単体へ変換します。
+    昇順（:asc）はAPI未対応のため、誤った逆順取得を防ぐためValueErrorを送出します。
     """
     if not sort_by:
         return None
     trimmed = sort_by.strip()
     if ":" in trimmed:
-        return trimmed.split(":")[0].strip()
+        field, order = trimmed.split(":", 1)
+        cleaned_order = order.strip().lower()
+        if cleaned_order == "asc":
+            raise ValueError(
+                f"IRBank APIのスクリーニングは降順（desc）ソートのみ対応しています。昇順（{sort_by}）は指定できません。"
+            )
+        return field.strip()
     return trimmed
 
 

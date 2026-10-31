@@ -58,7 +58,7 @@ class ScreeningService(SyncService):
 
         全該当銘柄をジェネレーターとして順番に返します。
         """
-        fetch_limit = max(limit, 50) if limit > 0 else 100
+        fetch_limit = min(max(limit, 50), 100) if limit > 0 else 100
         cursor: str | None = None
         while True:
             resp = self.screen(filters=filters, sort_by=sort_by, limit=fetch_limit, cursor=cursor)
@@ -108,7 +108,7 @@ class AsyncScreeningService(AsyncService):
         limit: int = 100,
     ) -> AsyncIterator[ScreenedSecurity]:
         """フィルター条件に合致する全銘柄を非同期で順次走査します。"""
-        fetch_limit = max(limit, 50) if limit > 0 else 100
+        fetch_limit = min(max(limit, 50), 100) if limit > 0 else 100
         cursor: str | None = None
         while True:
             resp = await self.screen(

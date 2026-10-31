@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import httpx
+import pytest
 from typer.testing import CliRunner
 
 from irbkpy import (
@@ -299,3 +300,44 @@ def test_iter_all_small_limit_protection():
 
     items = list(client.securities.iter_all(limit=2))
     assert len(items) == 1
+
+
+def test_screening_sort_by_asc_raises_error():
+    # sort_by="per:asc"などの昇順指定時にValueErrorが発生するか検証
+    client = IRBankClient(api_key="test_key")
+    with pytest.raises(ValueError, match="昇順"):
+        client.screening.screen(filters=["roe>=10"], sort_by="per:asc")
+
+
+def test_iter_all_and_prices_limit_clamped():
+    # securitiesのiter_allとiter_pricesで上限500が適用されるか検証
+    def handler(request: httpx.Request) -> httpx.Response:
+        limit_param = request.url.params.get("limit")
+        assert limit_param is not None and int(limit_param) == 500
+        if "/prices" in request.url.path:
+            return httpx.Response(200, json={"prices": [], "next_cursor": None})
+        return httpx.Response(200, json={"securities": [], "next_cursor": None})
+
+    transport = httpx.MockTransport(handler)
+    http_client = httpx.Client(transport=transport)
+    client = IRBankClient(api_key="test_key", http_client=http_client)
+
+    list(client.securities.iter_all(limit=1000))
+    list(client.securities.iter_prices("7203", limit=1000))
+
+
+def test_disclosures_and_screening_iter_limit_clamped():
+    # disclosuresとscreeningの走査で上限100が適用されるか検証
+    def handler(request: httpx.Request) -> httpx.Response:
+        limit_param = request.url.params.get("limit")
+        assert limit_param is not None and int(limit_param) == 100
+        if "/disclosures" in request.url.path:
+            return httpx.Response(200, json={"disclosures": [], "next_cursor": None})
+        return httpx.Response(200, json={"securities": [], "next_cursor": None})
+
+    transport = httpx.MockTransport(handler)
+    http_client = httpx.Client(transport=transport)
+    client = IRBankClient(api_key="test_key", http_client=http_client)
+
+    list(client.disclosures.iter_all("7203", limit=1000))
+    list(client.screening.iter_screen(filters=["roe>=10"], limit=1000))

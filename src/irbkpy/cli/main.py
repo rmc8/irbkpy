@@ -7,6 +7,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from .. import __version__
 from ..client import IRBankClient
 from ..exceptions import IRBankAPIError
 from ..models.base import IRBankBaseModel
@@ -19,6 +20,29 @@ app = typer.Typer(
 )
 console = Console()
 err_console = Console(stderr=True)
+
+
+def version_callback(value: bool) -> None:
+    """--versionオプション指定時にバージョン情報を表示して終了します。"""
+    if value:
+        console.print(f"irbkpy {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-v",
+        help="バージョン情報を表示して終了します。",
+        callback=version_callback,
+        is_eager=True,
+    ),
+) -> None:
+    """IRBank APIコマンドラインツールの共通オプションを処理します。"""
+    pass
+
 
 securities_app = typer.Typer(
     name="securities", help="銘柄情報、株価、信用取引データのコマンド群です。"

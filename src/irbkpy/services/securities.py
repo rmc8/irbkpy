@@ -52,8 +52,8 @@ class SecuritiesService(SyncService):
         1回あたりの取得件数上限（limit、APIカーソルの安定性のため最小50件を推奨）、業種（industry）、市場（market）を指定できます。
         全ページの銘柄データをジェネレーターとして順番に返します。
         """
-        # API仕様上、limitが小さすぎるとカーソルが***でマスクされてページングが止まるため安全最小値を適用
-        fetch_limit = max(limit, 50) if limit > 0 else 100
+        # API仕様上、limitが小さすぎるとカーソルがマスクされ、大きすぎると400となるため許容範囲（50〜500）にクランプ
+        fetch_limit = min(max(limit, 50), 500) if limit > 0 else 100
         cursor: str | None = None
         while True:
             resp = self.list(limit=fetch_limit, cursor=cursor, industry=industry, market=market)
@@ -103,7 +103,7 @@ class SecuritiesService(SyncService):
 
         期間（from_dateからto_date）内の全株価レコードをジェネレーターとして順番に返します。
         """
-        fetch_limit = max(limit, 50) if limit > 0 else 100
+        fetch_limit = min(max(limit, 50), 500) if limit > 0 else 100
         cursor: str | None = None
         while True:
             resp = self.get_prices(
@@ -209,7 +209,7 @@ class AsyncSecuritiesService(AsyncService):
         market: Market | MarketType | str | None = None,
     ) -> AsyncIterator[SecuritySummary]:
         """全銘柄を非同期でカーソルページネーションしながら順次走査します。"""
-        fetch_limit = max(limit, 50) if limit > 0 else 100
+        fetch_limit = min(max(limit, 50), 500) if limit > 0 else 100
         cursor: str | None = None
         while True:
             resp = await self.list(
@@ -253,7 +253,7 @@ class AsyncSecuritiesService(AsyncService):
         limit: int = 100,
     ) -> AsyncIterator[PriceRecord]:
         """指定した銘柄の株価履歴を非同期で走査します。"""
-        fetch_limit = max(limit, 50) if limit > 0 else 100
+        fetch_limit = min(max(limit, 50), 500) if limit > 0 else 100
         cursor: str | None = None
         while True:
             resp = await self.get_prices(
