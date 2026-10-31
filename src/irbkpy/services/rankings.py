@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ..models.rankings import RankingResponse
+from ..types import RankingMetric, RankingMetricType
 from .base import AsyncService, SyncService, build_query_params
 
 
@@ -12,13 +13,13 @@ class RankingsService(SyncService):
 
     def get(
         self,
-        metric: str,
+        metric: RankingMetric | RankingMetricType | str,
         target_date: str | None = None,
         limit: int | None = None,
     ) -> RankingResponse:
         """指定した指標名（metric）の市場ランキングを取得します。
 
-        指標名（metric、例: price_increase_rate、volumeなど）、対象日（target_date、YYYY-MM-DD形式）、件数上限（limit）を指定可能です。
+        指標名（metric、例: gainers, losers, volume）、対象日（target_date、YYYY-MM-DD形式）、件数上限（limit）を指定可能です。
         """
         params = build_query_params(target_date=target_date, limit=limit)
         data = self._client._get(f"/rankings/{metric}", params=params)
@@ -33,7 +34,7 @@ class AsyncRankingsService(AsyncService):
 
     async def get(
         self,
-        metric: str,
+        metric: RankingMetric | RankingMetricType | str,
         target_date: str | None = None,
         limit: int | None = None,
     ) -> RankingResponse:

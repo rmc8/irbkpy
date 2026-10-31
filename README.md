@@ -1,20 +1,26 @@
 # irbkpy
 
-IRBank API（REST）を操作するためのPythonクライアントライブラリおよびCLIツールです。httpxによる高速な同期・非同期通信、Pydantic v2による厳格な型安全性を備え、コマンドラインからも即座に企業データへアクセスできます。
+[![PyPI version](https://img.shields.io/pypi/v/irbkpy.svg?color=blue)](https://pypi.org/project/irbkpy/)
+[![Python versions](https://img.shields.io/badge/python-3.10+-blue.svg)](https://pypi.org/project/irbkpy/)
+[![CI status](https://img.shields.io/github/actions/workflow/status/rmc8/irbkpy/ci.yml?branch=main&label=CI)](https://github.com/rmc8/irbkpy/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-e92063.svg)](https://docs.pydantic.dev/)
 
----
+IRBank API（REST）を操作するためのPythonクライアントライブラリおよびCLIツールです。httpxによる高速な同期・非同期通信、Pydantic v2による厳格な型安全性を備え、コマンドラインからも即座に企業データへアクセスできます。
 
 ## 主な特徴
 
 - 全26エンドポイントのレスポンスをPydantic v2モデルで構造化しており、IDEの自動補完や静的型チェックに対応します。
+- 市場区分（`Market`）、東証33業種（`Industry`）、期間種別（`Period`）、ランキング指標（`RankingMetric`）などの文字列Enum（StrEnum）とLiteral型を完備し、タイプセーフな開発を支援します。
 - `IRBankClient`（同期）と`AsyncIRBankClient`（非同期）の両方を提供し、単体スクリプトからFastAPIなどのWebアプリケーションまで柔軟に組み込めます。
+- 配当やセグメント、大株主APIにおいて、証券コード（4桁）が指定された場合にEDINETコードを自動照会して透過的に補完します。
+- 短時間の連続リクエストによるレート制限（HTTP 429）に対し、自動で指数バックオフ待機を行って再試行します。
 - `to_pandas()`や`to_polars()`の呼び出しにより、株価や財務時系列データを1行でDataFrameへ変換できます。
 - SQLiteを用いたローカルキャッシュ機構を備え、同一条件の再照会ではAPIとの通信を行わず、日次リクエスト枠を節約します。
 - `iter_all()`や`iter_prices()`などのジェネレータ関数により、カーソル指定を気にせず全件を順次取得できます。
 - コマンドラインツール`irbk`を同梱しており、ターミナルから財務諸表や株価、ランキングを素早く照会できます。表形式の表示に加え、`--json`出力にも対応します。
 - APIキーは引数による直接指定のほか、環境変数（`IRBK_API_KEY`または`IRBANK_API_KEY`）や`.env`ファイルから自動で読み込まれます。
-
----
 
 ## インストール
 
@@ -38,8 +44,6 @@ pip install "irbkpy[all]"
 uv sync --all-extras
 ```
 
----
-
 ## 認証設定
 
 APIキーは[IRBANK Connect](https://app.irbank.net/mcp-api)にて発行できます。
@@ -55,14 +59,12 @@ export IRBK_API_KEY="irbk_key_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 IRBK_API_KEY="irbk_key_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
----
-
 ## Pythonライブラリとしての利用
 
 ### 同期クライアント（IRBankClient）
 
 ```python
-from irbkpy import IRBankClient
+from irbkpy import Industry, IRBankClient, Market, Period, RankingMetric
 
 # APIキーは環境変数IRBK_API_KEYまたは.envから自動解決されます
 with IRBankClient() as client:
@@ -75,24 +77,29 @@ with IRBankClient() as client:
     for p in prices.prices:
         print(f"{p.date} 終値{p.close}円（調整後{p.adj_close}円）")
 
-    # 3. 財務時系列の取得
-    financials = client.financials.get(code="7203", period="annual")
+    # 3. 財務時系列の取得（Period Enumによる指定）
+    financials = client.financials.get(code="7203", period=Period.ANNUAL)
     for period in financials.periods:
         print(f"{period.get('fiscal_year')} 売上高{period.get('sales'):,}円")
 
-    # 4. バリュエーション時系列の取得（PER、PBR、ROE、配当利回り等）
-    valuations = client.valuations.get(code="7203")
-    for h in valuations.history:
-        print(f"{h.fiscal_year} PER={h.per}倍 PBR={h.pbr}倍 ROE={h.roe}%")
+    # 4. 年次配当実績の取得（証券コードからEDINETコードを自動解決）
+    dividends = client.dividends.list("7203")
+    for d in dividends.history[:3]:
+        print(f"{d.fiscal_year} 1株配当{d.annual_dps_adjusted or d.annual_dps}円")
 
-    # 5. 条件スクリーニング
+    # 5. 条件スクリーニング（比較演算子による直感的な条件指定）
     results = client.screening.screen(
-        filters=["roe:gte:10", "per:lte:15"],
+        filters=["roe>=10", "per<=15"],
         sort_by="roe:desc",
         limit=10,
     )
     for s in results.securities:
         print(s.security_code, s.name)
+
+    # 6. 市場ランキングの取得（RankingMetric Enumによる指定）
+    ranking = client.rankings.get(RankingMetric.GAINERS, limit=5)
+    for item in ranking.items:
+        print(f"{item.get('rank')}位 {item.get('name')}（{item.get('security_code')}）")
 ```
 
 ### PandasおよびPolarsへの変換
@@ -136,11 +143,13 @@ with IRBankClient(enable_cache=True, cache_ttl=86400) as client:
 ### 自動ページネーション
 
 ```python
-from irbkpy import IRBankClient
+from irbkpy import Industry, IRBankClient, Market
 
 with IRBankClient() as client:
-    # 東証プライム市場の全銘柄を逐次取得
-    for sec in client.securities.iter_all(market="Prime"):
+    # 東証プライム市場・輸送用機器の全銘柄を逐次取得
+    for sec in client.securities.iter_all(
+        market=Market.PRIME, industry=Industry.TRANSPORTATION_EQUIPMENT
+    ):
         print(sec.code, sec.name)
 ```
 
@@ -182,8 +191,6 @@ with IRBankClient() as client:
         print("APIキーが無効、または未設定です。")
 ```
 
----
-
 ## CLIツールの利用方法
 
 コマンドラインツール`irbk`が利用できます。
@@ -195,8 +202,8 @@ irbk --help
 # 本日の残りリクエスト数の確認
 irbk usage
 
-# 銘柄一覧の取得（市場区分で絞り込み）
-irbk securities list --market Prime --limit 20
+# 銘柄一覧の取得（市場区分「プライム」や業種で絞り込み）
+irbk securities list --market Prime --industry="輸送用機器" --limit 20
 
 # 銘柄基本情報の取得
 irbk securities get 7203
@@ -213,20 +220,23 @@ irbk indicators 7203
 # 年次バリュエーション（PER、PBR、配当利回り等）の取得
 irbk valuations 7203
 
-# 年次配当実績の取得
+# 年次配当実績の取得（証券コードで照会可能）
 irbk dividends 7203
 
 # 競合企業一覧の取得
 irbk peers 7203
 
-# 複数条件による銘柄スクリーニング
-irbk screening run "roe:gte:15,per:lte:10" --sort-by "roe:desc"
+# 複数条件による銘柄スクリーニング（一般的な比較演算子形式に対応）
+irbk screening run "roe>=15,per<=10" --sort-by "per:asc"
 
-# 指標別ランキングの取得（値上がり率、ROE等）
+# 指標別ランキングの取得（値上がり率、値下がり率、出来高）
 irbk rankings gainers --limit 10
 
 # 開示書類一覧の取得
 irbk disclosures 7203 --limit 10
+
+# キャッシュを無視して最新データを取得する場合
+irbk securities get 7203 --no-cache
 ```
 
 ### JSON出力（他ツールとの連携）
@@ -237,8 +247,6 @@ irbk disclosures 7203 --limit 10
 # 発行済株式数のみを抽出
 irbk securities get 7203 --json | jq .issued_shares
 ```
-
----
 
 ## 提供エンドポイント一覧
 
@@ -271,15 +279,11 @@ irbk securities get 7203 --json | jq .issued_shares
 | rankings | `GET /rankings/{metric}` | `client.rankings.get()` | `irbk rankings` |
 | usage | `GET /usage` | `client.usage.get()` | `irbk usage` |
 
----
-
 ## テストの実行
 
 ```bash
 uv run pytest
 ```
-
----
 
 ## 継続的インテグレーション（CI）とPyPI自動デプロイ
 

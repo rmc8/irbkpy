@@ -44,7 +44,7 @@ class DisclosuresService(SyncService):
         while True:
             resp = self.list(code=code, limit=limit, cursor=cursor)
             yield from resp.disclosures
-            if not resp.next_cursor:
+            if not resp.next_cursor or resp.next_cursor == "***":
                 break
             cursor = resp.next_cursor
 
@@ -93,7 +93,7 @@ class AsyncDisclosuresService(AsyncService):
             resp = await self.list(code=code, limit=limit, cursor=cursor)
             for item in resp.disclosures:
                 yield item
-            if not resp.next_cursor:
+            if not resp.next_cursor or resp.next_cursor == "***":
                 break
             cursor = resp.next_cursor
 

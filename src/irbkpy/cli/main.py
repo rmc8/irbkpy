@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, cast
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -10,7 +10,7 @@ from rich.table import Table
 from ..client import IRBankClient
 from ..exceptions import IRBankAPIError
 from ..models.base import IRBankBaseModel
-from ..services.financials import PeriodType
+from ..types import MarketType, PeriodType, RankingMetric
 
 app = typer.Typer(
     name="irbk",
@@ -29,13 +29,14 @@ screening_app = typer.Typer(name="screening", help="銘柄スクリーニング�
 app.add_typer(screening_app)
 
 
-def get_client(api_key: str | None = None) -> IRBankClient:
+def get_client(api_key: str | None = None, no_cache: bool = False) -> IRBankClient:
     """IRBankClientのインスタンスを生成して返します。
 
     APIキーが明示的に渡されない場合は環境変数や.envファイルから自動解決します。
+    CLI実行時は既定でローカルキャッシュを有効化し、APIリクエスト枠の消費を抑制します。
     """
     try:
-        return IRBankClient(api_key=api_key)
+        return IRBankClient(api_key=api_key, enable_cache=not no_cache)
     except ValueError as e:
         err_console.print(f"[bold red]エラー:[/bold red] {e}")
         raise typer.Exit(code=1)
@@ -66,7 +67,7 @@ def usage(
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """当日のAPI利用可能残数を確認します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=True)
     try:
         res = client.usage.get()
         if as_json:
@@ -90,17 +91,23 @@ def usage(
 # ----------------------------------------------------------------------
 @securities_app.command("list")
 def securities_list(
-    limit: int = typer.Option(50, "--limit", "-l", help="取得件数の上限。"),
-    market: str | None = typer.Option(
-        None, "--market", "-m", help="市場区分フィルター（プライム、スタンダードなど）。"
+    limit: int = typer.Option(50, "--limit", "-l", help="取得件数の上限（最大500件）。"),
+    market: MarketType | None = typer.Option(
+        None,
+        "--market",
+        "-m",
+        help="市場区分フィルター（Prime, Standard, Growthまたは日本語指定）。",
     ),
-    industry: str | None = typer.Option(None, "--industry", "-i", help="業種コードフィルター。"),
+    industry: str | None = typer.Option(
+        None, "--industry", "-i", help="業種名フィルター（水産・農林業、輸送用機器など）。"
+    ),
     cursor: str | None = typer.Option(None, "--cursor", help="改ページ用のカーソル。"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """上場銘柄の一覧を取得します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
         res = client.securities.list(limit=limit, market=market, industry=industry, cursor=cursor)
         if as_json:
@@ -116,7 +123,7 @@ def securities_list(
         for s in res.securities:
             table.add_row(s.code, s.name, s.market or "-", s.industry or "-")
         console.print(table)
-        if res.next_cursor:
+        if res.next_cursor and res.next_cursor != "***":
             console.print(f"[dim]次ページカーソル: {res.next_cursor}[/dim]")
     except IRBankAPIError as e:
         err_console.print(f"[bold red]APIエラー:[/bold red] {e}")
@@ -126,11 +133,12 @@ def securities_list(
 @securities_app.command("get")
 def securities_get(
     code: str = typer.Argument(..., help="銘柄コード（例: 7203）。"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """指定銘柄の詳細情報を取得します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
         res = client.securities.get(code)
         if as_json:
@@ -161,12 +169,13 @@ def securities_prices(
     code: str = typer.Argument(..., help="銘柄コード（例: 7203）。"),
     from_date: str | None = typer.Option(None, "--from", help="取得開始日（YYYY-MM-DD）。"),
     to_date: str | None = typer.Option(None, "--to", help="取得終了日（YYYY-MM-DD）。"),
-    limit: int = typer.Option(20, "--limit", "-l", help="取得件数の上限。"),
+    limit: int = typer.Option(20, "--limit", "-l", help="取得件数の上限（最大500件）。"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """指定銘柄の日次株価四本値を取得します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
         res = client.securities.get_prices(code, from_date=from_date, to_date=to_date, limit=limit)
         if as_json:
@@ -193,7 +202,7 @@ def securities_prices(
                 f"{p.volume:,.0f}" if p.volume is not None else "-",
             )
         console.print(table)
-        if res.next_cursor:
+        if res.next_cursor and res.next_cursor != "***":
             console.print(f"[dim]次ページカーソル: {res.next_cursor}[/dim]")
     except IRBankAPIError as e:
         err_console.print(f"[bold red]APIエラー:[/bold red] {e}")
@@ -206,20 +215,21 @@ def securities_prices(
 @app.command("financials")
 def financials_cmd(
     code: str = typer.Argument(..., help="銘柄コードまたはEDINETコード。"),
-    period: str = typer.Option(
+    period: PeriodType = typer.Option(
         "annual", "--period", "-p", help="期間種別（annual、quarterly、semiannual）。"
     ),
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """企業の財務諸表時系列データを取得します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
-        is_edinet = code.startswith("E") and len(code) == 6
+        is_edinet = code.startswith(("E", "G")) and len(code) == 6
         res = client.financials.get(
             edinet_code=code if is_edinet else None,
             code=None if is_edinet else code,
-            period=cast(PeriodType, period),
+            period=period,
         )
         if as_json:
             output_result(res, as_json=True)
@@ -256,20 +266,21 @@ def financials_cmd(
 @app.command("indicators")
 def indicators_cmd(
     code: str = typer.Argument(..., help="銘柄コードまたはEDINETコード。"),
-    period: str = typer.Option(
-        "annual", "--period", "-p", help="期間種別（annual、quarterly、semiannual）。"
+    period: PeriodType = typer.Option(
+        "annual", "--period", "-p", help="期間種別（※現在サーバー仕様により通期10期を返却）。"
     ),
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """企業の主要経営指標・財務比率の時系列推移を取得します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
-        is_edinet = code.startswith("E") and len(code) == 6
+        is_edinet = code.startswith(("E", "G")) and len(code) == 6
         res = client.indicators.get(
             edinet_code=code if is_edinet else None,
             code=None if is_edinet else code,
-            period=cast(PeriodType, period),
+            period=period,
         )
         if as_json:
             output_result(res, as_json=True)
@@ -306,11 +317,12 @@ def indicators_cmd(
 @app.command("valuations")
 def valuations_cmd(
     code: str = typer.Argument(..., help="銘柄コード（例: 7203）。"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """指定銘柄の年次投資指標推移（PER、PBRなど）を取得します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
         res = client.valuations.get(code=code)
         if as_json:
@@ -329,12 +341,19 @@ def valuations_cmd(
         table.add_column("時価総額（円）", justify="right")
 
         for h in res.history:
+            # 報告値が欠損している場合は調整後値（adjusted）で補完表示
+            price_val = h.stock_price if h.stock_price is not None else h.stock_price_adjusted
+            pbr_val = h.pbr if h.pbr is not None else h.pbr_adjusted
+            yield_val = (
+                h.dividend_yield if h.dividend_yield is not None else h.dividend_yield_adjusted
+            )
+
             table.add_row(
                 str(h.fiscal_year or "-"),
-                f"{h.stock_price:,.1f}" if h.stock_price is not None else "-",
+                f"{price_val:,.1f}" if price_val is not None else "-",
                 f"{h.per:.1f}" if h.per is not None else "-",
-                f"{h.pbr:.2f}" if h.pbr is not None else "-",
-                f"{h.dividend_yield:.2f}" if h.dividend_yield is not None else "-",
+                f"{pbr_val:.2f}" if pbr_val is not None else "-",
+                f"{yield_val:.2f}" if yield_val is not None else "-",
                 f"{h.market_cap:,.0f}" if h.market_cap is not None else "-",
             )
         console.print(table)
@@ -345,14 +364,17 @@ def valuations_cmd(
 
 @app.command("dividends")
 def dividends_cmd(
-    code: str = typer.Argument(..., help="銘柄コードまたはEDINETコード。"),
+    code: str = typer.Argument(
+        ..., help="銘柄コードまたはEDINETコード（証券コード指定時は自動解決されます）。"
+    ),
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """企業の配当履歴および配当指標データを取得します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
-        is_edinet = code.startswith("E") and len(code) == 6
+        is_edinet = code.startswith(("E", "G")) and len(code) == 6
         res = client.dividends.list(
             edinet_code=code if is_edinet else None,
             code=None if is_edinet else code,
@@ -391,11 +413,12 @@ def dividends_cmd(
 def peers_cmd(
     code: str = typer.Argument(..., help="銘柄コード（例: 7203）。"),
     limit: int = typer.Option(8, "--limit", "-l", help="取得件数の上限（最大20件）。"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """指定銘柄の競合企業・類似銘柄一覧を取得します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
         res = client.peers.list(code=code, limit=limit)
         if as_json:
@@ -425,16 +448,20 @@ def peers_cmd(
 # ----------------------------------------------------------------------
 @screening_app.command("run")
 def screening_run(
-    filters: str = typer.Argument(..., help='カンマ区切りの条件式（例: "roe>=10,per<=15"）。'),
+    filters: str = typer.Argument(
+        ...,
+        help='カンマ区切りの条件式（例: "per:lte:15,roe:gte:10" または "per<=15,roe>=10"）。',
+    ),
     sort_by: str | None = typer.Option(
-        None, "--sort-by", "-s", help="並び替え基準（例: roe:desc）。"
+        None, "--sort-by", "-s", help="並び替え基準（例: per:asc, per:desc）。"
     ),
     limit: int = typer.Option(20, "--limit", "-l", help="取得件数の上限。"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """複数条件による銘柄スクリーニングを実行します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
         res = client.screening.screen(filters=filters, sort_by=sort_by, limit=limit)
         if as_json:
@@ -468,11 +495,12 @@ def screening_run(
 
 @screening_app.command("fields")
 def screening_fields(
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """スクリーニングで利用可能な指標・項目一覧を表示します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
         res = client.screening.list_fields()
         if as_json:
@@ -499,14 +527,15 @@ def screening_fields(
 # ----------------------------------------------------------------------
 @app.command("rankings")
 def rankings_cmd(
-    metric: str = typer.Argument(..., help="指標キー（gainers、roe、dividend_yieldなど）。"),
+    metric: RankingMetric = typer.Argument(..., help="指標キー（gainers, losers, volume）。"),
     target_date: str | None = typer.Option(None, "--date", "-d", help="基準日（YYYY-MM-DD）。"),
     limit: int = typer.Option(20, "--limit", "-l", help="取得件数の上限。"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """指定指標の市場ランキングデータを取得します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
         res = client.rankings.get(metric, target_date=target_date, limit=limit)
         if as_json:
@@ -548,12 +577,13 @@ def rankings_cmd(
 @app.command("disclosures")
 def disclosures_cmd(
     code: str = typer.Argument(..., help="銘柄コード（例: 7203）。"),
-    limit: int = typer.Option(20, "--limit", "-l", help="取得件数の上限。"),
+    limit: int = typer.Option(20, "--limit", "-l", help="取得件数の上限（最大100件）。"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="ローカルキャッシュを無効化します。"),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="IRBank APIキー。"),
     as_json: bool = typer.Option(False, "--json", help="未加工のJSONを出力します。"),
 ) -> None:
     """指定銘柄の開示書類一覧を取得します。"""
-    client = get_client(api_key)
+    client = get_client(api_key, no_cache=no_cache)
     try:
         res = client.disclosures.list(code, limit=limit)
         if as_json:
